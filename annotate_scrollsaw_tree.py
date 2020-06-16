@@ -28,7 +28,7 @@ args = parser.parse_args()
 
 if not args.p:
     prefix = os.path.basename(args.tree)
-    prefix = [:prefix.find('.')]
+    prefix = prefix[:prefix.find('.')]
 else:
     prefix = args.p
 if args.b:
