@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Load modules
 from ete3 import TreeStyle
 from feca2leca import *
-from eukarya import *
 import os
 import argparse
 ts = TreeStyle()
@@ -24,6 +23,8 @@ parser.add_argument('-d', metavar = 'xx|0.xx', help = 'threshold for duplication
 parser.add_argument("-l", metavar = "0.xx", help = "coverage threshold for LECA calling (DEFAULT: 0.15)", type = float, default = 0.15)
 parser.add_argument('-m', help = 'mode for calculating the branch lengths in case of duplications (minimum (DEFAULT), maximum, median or mean)', choices = ('median', 'minimum', 'maximum', 'mean'), default = 'minimum')
 parser.add_argument('-c', help = 'if mode is minimum or maximum, find the branch length corresponding to the minimal/maximal raw branch length (DEFAULT: off)', action = 'store_true')
+parser.add_argument("-r", metavar = "root", help = "position of eukaryotic root (DEFAULT: Opimoda-Diphoda)", default = "OD")
+parser.add_argument("-s", metavar = "supergroups", help = "supergroups definition used", type = int, choices = (4, 5, 6), default = 5)
 args = parser.parse_args()
 
 if not args.p:
@@ -65,10 +66,18 @@ if args.c:
         corresponding = True
     else:
         sys.exit('Error: -c can only be used in the minimum or maximum mode')
+root_name = args.r
+if args.s == 5:
+    supergroups = supergroups5
+elif args.s == 4:
+    supergroups = supergroups4
+else:
+    supergroups = supergroups6
 
-# Open tree and annotate leaves
+# Open tree, get supergroups and annotate leaves
 tree = open_tree(args.tree)
-annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, supergroups2, supergroups5)
+root_daughters = get_root_daughters(root_name, supergroups4)
+annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, root_daughters, supergroups)
 leca_dict = {}
 dupl_dict = {}
 unknown_dict = {}
@@ -111,8 +120,8 @@ if euk_only:
     tree.set_outgroup(root)
 
     # Call duplications in unrooted mode and reroot tree
-    tree = annotate_and_reroot_euk_only(tree, supergroups5, representing, coverage_criterion, duplication_criterion, consistency)
-    if not annotate_overlap_all_assigned(tree, representing, supergroups5, coverage_criterion, duplication_criterion, consistency): # Annotate nodes (new duplications and LECAs may be found, because now only one consistency value is considered) and get relevant coverage and redundancy values
+    tree = annotate_and_reroot_euk_only(tree, supergroups, representing, coverage_criterion, duplication_criterion, consistency)
+    if not annotate_overlap_all_assigned(tree, representing, supergroups, coverage_criterion, duplication_criterion, consistency): # Annotate nodes (new duplications and LECAs may be found, because now only one consistency value is considered) and get relevant coverage and redundancy values
         sys.exit(f'No confident LECA in this tree: coverage = {tree.coverage}')
         # Actually, if there are new LECAs now, the position of the root should be recalculated, and then again, the duplications and LECAs should be inferred, and again...
 
@@ -134,7 +143,7 @@ else: # prok + euk
             non_feca_clades.append(euk_clade)
     failed_fecas = []
     for euk_clade in feca_clades:
-        feca_confidence = annotate_overlap_all_assigned(euk_clade, representing, supergroups5, coverage_criterion, duplication_criterion, consistency)
+        feca_confidence = annotate_overlap_all_assigned(euk_clade, representing, supergroups, coverage_criterion, duplication_criterion, consistency)
         if not feca_confidence:
             failed_fecas.append(euk_clade)
             non_feca_clades.append(euk_clade)
@@ -244,12 +253,11 @@ else: # prok + euk
             ancestry = classify_sister(lca)
             species = []
             sequences = []
-            supergroup_counts = {'Obazoa':0, 'Amoebozoa':0, 'RASH':0, 'Archaeplastida':0,'Excavata':0}
             repr_species = []
             for leaf in non_feca_clade:
                 species.append(leaf.taxid)
                 sequences.append(leaf.name)
-            coverage, copy_no, list_species = infer_coverage_redundancy(euk_clade, representing, supergroups5)
+            coverage, copy_no, list_species = infer_coverage_redundancy(euk_clade, representing, supergroups)
             print(prefix, 'Non-FECA' + str(count), lca_name, ancestry, support, coverage, ','.join(species), ','.join(sequences), ','.join(list_species), sep = '\t', file = non_feca_out)
 
     # Print branch lengths and FECA information

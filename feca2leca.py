@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Functions for annotating FECA-to-LECA trees
 
@@ -8,6 +8,7 @@ from ete3 import NCBITaxa
 from ete3 import TextFace
 import collections
 from numpy import mean, median
+from eukarya import *
 from scrollsaw import *
 ncbi = NCBITaxa()
 
@@ -29,13 +30,13 @@ def open_tree(tree_file_path):
         sys.exit('Error: tree format not recognised')
     return tree
 
-def annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, supergroups2, supergroups5):
+def annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, root_daughters = supergroups2, supergroups = supergroups5):
     """Distinguishes prokaryotic (NCBI taxid) and eukaryotic leave names and annotates them"""
     if euk_only:
         for leaf in tree:
             taxid = leaf.name[0:4]
             try:
-                leaf.add_features(taxid = taxid, supergroup2 = supergroups2[taxid], supergroup5 = supergroups5[taxid])
+                leaf.add_features(taxid = taxid, root_daughter = root_daughters[taxid], supergroup = supergroups[taxid])
             except KeyError:
                 sys.exit(f'Error: species {taxid} (sequence ID: {leaf.name}) not recognised')
     else:
@@ -45,7 +46,7 @@ def annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, supergroups2, supergr
                 leaf.add_features(taxid = taxid, prok_euk = 'Prokaryote')
             else:
                 taxid = leaf.name[0:4]
-                leaf.add_features(taxid = taxid, supergroup2 = supergroups2[taxid], supergroup5 = supergroups5[taxid], prok_euk = 'Eukaryote')
+                leaf.add_features(taxid = taxid, root_daughter = root_daughters[taxid], supergroup = supergroups[taxid], prok_euk = 'Eukaryote')
 
 def prok_filter(tree, level = 'genus'):
     """Filters interspersing prokaryotes (either single or same species or other level).
@@ -141,15 +142,11 @@ Note: if there is only one prokaryotic leaf, this one will be removed."""
     return pruned
 
 def feca2leca(leaves):
-    """Determines if clade fulfills FECA-2-LECA criteria: both Opimoda and Diphoda present"""
-    opimoda = 0
-    diphoda = 0
+    """Determines if clade fulfills FECA-2-LECA criteria: both sides of the root present"""
+    root_daughter_groups = set()
     for leaf in leaves:
-        if leaf.supergroup2 == 'Opimoda':
-            opimoda += 1
-        elif leaf.supergroup2 == 'Diphoda':
-            diphoda += 1
-        if opimoda > 0 and diphoda > 0:
+        root_daughter_groups.add(leaf.root_daughter)
+        if len(root_daughter_groups) == 2:
             break
     else:
         return False
@@ -162,7 +159,7 @@ def duplication_check(leaves1, leaves2):
     else:
         return False
 
-def duplication_check_unrooted(node, tree, tips, supergroups5, representing = None, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True, scrollsaw = True):
+def duplication_check_unrooted(node, tree, tips, supergroups, representing = None, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True, scrollsaw = True):
     """Duplication check in euk only tree, see annotate_and_reroot_euk_only"""
     if len(node.get_children()) > 2:
         node.resolve_polytomy(recursive = False)
@@ -173,7 +170,7 @@ def duplication_check_unrooted(node, tree, tips, supergroups5, representing = No
     species = []
     for leaves in [leaves1, leaves2, leaves3]:
         if scrollsaw:
-            coverage, copies, repr_species = infer_coverage_redundancy(leaves, representing, supergroups5)
+            coverage, copies, repr_species = infer_coverage_redundancy(leaves, representing, supergroups)
             if coverage < coverage_criterion:
                 return False
             species.append(set(repr_species))
@@ -192,17 +189,17 @@ def duplication_check_unrooted(node, tree, tips, supergroups5, representing = No
         else:
             return False
 
-def duplication_check_rooted(node, supergroups5, representing = None, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True, scrollsaw = True):
+def duplication_check_rooted(node, supergroups, representing = None, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True, scrollsaw = True):
     """Duplication check in euk only tree, see annotate_and_reroot_euk_only"""
     daughter1, daughter2 = node.get_children()
     if not duplication_check(daughter1.get_leaves(), daughter2.get_leaves()):
         return False
     if scrollsaw:
         repr_daughter = {}
-        repr_daughter[1] = infer_coverage_redundancy(daughter1, representing, supergroups5)
+        repr_daughter[1] = infer_coverage_redundancy(daughter1, representing, supergroups)
         if repr_daughter[1][0] < coverage_criterion:
             return False
-        repr_daughter[2] = infer_coverage_redundancy(daughter2, representing, supergroups5)
+        repr_daughter[2] = infer_coverage_redundancy(daughter2, representing, supergroups)
         if repr_daughter[2][0] < coverage_criterion:
             return False
         overlap = len(set(repr_daughter[1][2]) & set(repr_daughter[2][2]))
@@ -220,7 +217,7 @@ def duplication_check_rooted(node, supergroups5, representing = None, coverage_c
         else:
             return overlap
 
-def annotate_and_reroot_euk_only(tree, supergroups5, representing = None, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True, scrollsaw = True):
+def annotate_and_reroot_euk_only(tree, supergroups, representing = None, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True, scrollsaw = True):
     """Root tree on mid of longest possible distance between the LECAs. Written by Jolien, adapted for ScrollSaw trees."""
     for node in tree.traverse("preorder"):
         node.add_features(identity = "?")
@@ -228,7 +225,7 @@ def annotate_and_reroot_euk_only(tree, supergroups5, representing = None, covera
     dup_counter=0
     for node in tree.iter_descendants("preorder"): ##don't visit root: only two directions (only descendants)
         if not node.is_leaf():
-            if duplication_check_unrooted(node, tree, tips, supergroups5, representing, coverage_criterion, duplication_criterion, consistency, scrollsaw):
+            if duplication_check_unrooted(node, tree, tips, supergroups, representing, coverage_criterion, duplication_criterion, consistency, scrollsaw):
                 # Duplications only called if there are at least 2 duplications, otherwise no internal node fulfilling this check
                 dup_counter += 1
                 node.add_features(identity = "duplication", name = "D"+str(dup_counter))
@@ -374,7 +371,7 @@ def annotate_and_reroot_euk_only(tree, supergroups5, representing = None, covera
             if node.is_leaf():
                 continue
             tree.set_outgroup(node)
-            check = duplication_check_rooted(tree, supergroups5, representing, coverage_criterion, duplication_criterion, consistency, scrollsaw) # If fulfilling criteria length overlap, else True/False
+            check = duplication_check_rooted(tree, supergroups, representing, coverage_criterion, duplication_criterion, consistency, scrollsaw) # If fulfilling criteria length overlap, else True/False
             if check:
                 if check > tmp_overlap:
                     tmp_outgroup = node
@@ -403,13 +400,13 @@ def get_euk_clades(tree):
     clades = tree.get_monophyletic(values = ['Eukaryote'], target_attr = 'prok_euk')
     return clades
 
-def annotate_overlap_all_assigned(feca, representing, supergroups5, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True):
+def annotate_overlap_all_assigned(feca, representing, supergroups, coverage_criterion = 0.15, duplication_criterion = 0.2, consistency = True):
     """Annotate eukaryotic nodes, including the represented sequences"""
     for node in feca.traverse('preorder'):
         if not node.is_leaf():
             if len(node.get_children()) > 2:
                 node.resolve_polytomy(recursive = False)
-        coverage, copies, repr_species = infer_coverage_redundancy(node, representing, supergroups5)
+        coverage, copies, repr_species = infer_coverage_redundancy(node, representing, supergroups)
         node.add_features(coverage = coverage, redundancy = copies, repr_species = repr_species, identity = '?')
     for node in feca.traverse('preorder'):
         if node.is_leaf():

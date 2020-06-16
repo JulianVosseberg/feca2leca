@@ -3,7 +3,6 @@
 # Load modules
 from ete3 import TreeStyle
 from feca2leca import *
-from eukarya import *
 import os
 import argparse
 ts = TreeStyle()
@@ -22,6 +21,8 @@ parser.add_argument('-f', help = 'use only farthest leaf for rooting (DEFAULT: o
 parser.add_argument('-d', metavar = 'xx|0.xx', help = 'threshold for duplication consistency (< 1) or species overlap (> 1) for duplications calling (DEFAULT: 0.2)', default = 0.2, type = float)
 parser.add_argument('-m', help = 'mode for calculating the branch lengths in case of duplications (minimum (DEFAULT), maximum, median or mean)', choices = ('median', 'minimum', 'maximum', 'mean'), default = 'minimum')
 parser.add_argument('-c', help = 'if mode is minimum or maximum, find the branch length corresponding to the minimal/maximal raw branch length (DEFAULT: off)', action = 'store_true')
+parser.add_argument("-r", metavar = "root", help = "position of eukaryotic root (DEFAULT: Opimoda-Diphoda)", default = "OD")
+parser.add_argument("-s", metavar = "supergroups", help = "supergroups definition used", type = int, choices = (4, 5, 6), default = 5)
 args = parser.parse_args()
 
 if not args.p:
@@ -56,10 +57,18 @@ if args.c:
         corresponding = True
     else:
         sys.exit('Error: -c can only be used in the minimum or maximum mode')
+root_name = args.r
+if args.s == 5:
+    supergroups = supergroups5
+elif args.s == 4:
+    supergroups = supergroups4
+else:
+    supergroups = supergroups6
 
 # Open tree, get supergroups and annotate leaves
 tree = open_tree(args.tree)
-annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, supergroups2, supergroups5)
+root_daughters = get_root_daughters(root_name, supergroups4)
+annotate_prokaryotic_eukaryotic_leaves(tree, euk_only, root_daughters, supergroups)
 leca_dict = {}
 dupl_dict = {}
 unknown_dict = {}
@@ -93,7 +102,7 @@ if euk_only:
     tree.set_outgroup(root)
 
     # Call duplications in unrooted mode and reroot tree
-    tree = annotate_and_reroot_euk_only(tree, supergroups5, scrollsaw = False, duplication_criterion = duplication_criterion, consistency = consistency)
+    tree = annotate_and_reroot_euk_only(tree, supergroups, scrollsaw = False, duplication_criterion = duplication_criterion, consistency = consistency)
     annotate_non_scrollsaw(tree, duplication_criterion, consistency)
     # Actually, if there are new LECAs now, the position of the root should be recalculated, and then again, the duplications and LECAs should be inferred, and again...
 

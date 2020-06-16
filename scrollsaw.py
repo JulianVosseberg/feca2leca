@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Functions for using FECA-to-LECA ScrollSaw trees
 
@@ -49,12 +49,14 @@ def assign_all_seqs(tree_seqs, all_seqs, euk_only, prefix, blast_path):
             representing[best_hit] = [query]
     return representing
 
-def infer_coverage_redundancy(node, representing, supergroups5, tree = True):
-    number_species = {'Obazoa':123, 'Amoebozoa':6, 'RASH':43, 'Archaeplastida':24, 'Excavata':13}
+def infer_coverage_redundancy(node, representing, supergroups, tree = True):
+    number_species = {}
+    for group in supergroups.values():
+        number_species[group] = number_species.get(group, 0) + 1
     all_species = []
     species_counts = {}
-    supergroup_counts = {'Obazoa':0, 'Amoebozoa':0, 'RASH':0, 'Archaeplastida':0, 'Excavata':0}
-    group_species_counts = {'Obazoa':[], 'Amoebozoa':[], 'RASH':[], 'Archaeplastida':[], 'Excavata':[]}
+    supergroup_counts = {group: 0 for group in number_species}
+    group_species_counts = {group: [] for group in number_species}
     for leaf in node: # node can also be a list of leaves instead
         if tree:
             name = leaf.name
@@ -69,15 +71,15 @@ def infer_coverage_redundancy(node, representing, supergroups5, tree = True):
         if spec in species_counts:
             species_counts[spec] += 1
         else:
-            supergroup = supergroups5[spec]
+            supergroup = supergroups[spec]
             supergroup_counts[supergroup] += 1
             species_counts[spec] = 1
     coverages = []
     for group, counts in supergroup_counts.items():
         coverages.append(counts / number_species[group])
-    coverage_av = sum(coverages) / 5
+    coverage_av = sum(coverages) / len(number_species)
     for spec, counts in species_counts.items():
-        group = supergroups5[spec]
+        group = supergroups[spec]
         group_species_counts[group].append(counts)
     redundancy_med = median([median(counts) for counts in group_species_counts.values() if len(counts) > 0])
     return coverage_av, redundancy_med, list(species_counts.keys())
