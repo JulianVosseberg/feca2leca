@@ -1,6 +1,6 @@
 # Analysis of duplications during eukaryogenesis (from FECA to LECA)
 
-This repository contains scripts to annotate phylogenetic trees containing duplications during eukaryogenesis, as used in "Timing the origin of eukaryotic cellular complexity with ancient duplications" (Vosseberg, Van Hooff, et al.; preprint at bioRxiv: https://www.biorxiv.org/content/10.1101/823484v1).
+This repository contains scripts to annotate phylogenetic trees containing duplications during eukaryogenesis, as used in "Timing the origin of eukaryotic cellular complexity with ancient duplications" (Vosseberg, Van Hooff, _et al._; preprint at bioRxiv: https://www.biorxiv.org/content/10.1101/823484v1).
 
 ## Dependencies
 - Python 3.6 or higher
@@ -11,7 +11,7 @@ This repository contains scripts to annotate phylogenetic trees containing dupli
 
 ### Input
 - Newick tree file
-- BLAST files: an all-versus-all (`<pfam>\_blastp.txt`) and own-versus-own file (`<pfam>\_blastp\_own.txt`)
+- BLAST files: an all-versus-all (`<pfam>_blastp.txt`) and own-versus-own file (`<pfam>_blastp_own.txt`)
 - File containing a list of all sequence IDs prior to ScrollSaw downsampling (`<pfam>_seqids.list`)
 
 ### Usage
